@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chat App</title>
+    <!-- Add your CSS styles here -->
+</head>
+
+<body>
+    <div>
+        <input type="text" id="messageInput" placeholder="Type a message...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        // function sendMessage() {
+        //     const message = document.getElementById('messageInput').value;
+        //     const userId = 5; // Your dynamic user ID here
+
+        //     // Establish WebSocket connection
+        //     const ws = new WebSocket(`ws://127.0.0.1:8000/chat/ws/${userId}`);
+
+        //     ws.onopen = function () {
+        //         // Send message to the WebSocket server
+        //         const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MywidXNlcm5hbWUiOiJ2aXNoYWwiLCJleHAiOjE3MDE3NzAwOTF9.-3XKARHcw-eq6gdN0BIh79mc1lQHho_wwifFqiOqGuI"; // Replace with the actual token
+        //         // ws.send(JSON.stringify({ Authorization:token, message: "Initial message" }));
+        //         ws.send(JSON.stringify({ headers: { Authorization: token }, message: "Initial message" }));
+        //         ws.send(message);
+        //     };
+
+
+
+        //     ws.onerror = function (error) {
+        //         console.error('WebSocket error:', error);
+        //     };
+
+        //     ws.onclose = function () {
+        //         console.log('WebSocket connection closed');
+        //     };
+        // }
+
+        let ws;
+        const userId = 5; // Replace with the actual user ID
+
+        function initializeWebSocket() {
+            const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MywidXNlcm5hbWUiOiJ2aXNoYWwiLCJleHAiOjE3MDE3NzAwOTF9.-3XKARHcw-eq6gdN0BIh79mc1lQHho_wwifFqiOqGuI'; // Replace with your actual token
+            ws = new WebSocket(`ws://127.0.0.1:8000/chat/ws/${userId}`);
+
+            ws.onopen = function () {
+                const message = {
+                    authorization: token,
+                    content: 'Initial message'
+                };
+                ws.send(JSON.stringify(message));
+            };
+
+            ws.onmessage = function (event) {
+                // Handle received messages
+            };
+
+            ws.onerror = function (error) {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = function () {
+                console.log('WebSocket connection closed');
+            };
+        }
+
+        // Initialize WebSocket when the page loads
+        initializeWebSocket();
+
+        // Function to send subsequent messages
+        function sendMessage() {
+            const message = document.getElementById('messageInput').value;
+            ws.send(message);
+        }
+
+    </script>
+</body>
+
+</html>
