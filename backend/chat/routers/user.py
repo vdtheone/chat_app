@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -25,6 +25,7 @@ def get_db():
 
 active_connections = {}
 web_list = []
+user_statuses = {}
 
 
 async def authenticate_user(websocket: WebSocket, db: Session):
@@ -40,19 +41,38 @@ async def authenticate_user(websocket: WebSocket, db: Session):
 async def handle_websocket_communication(
     websocket: WebSocket, user_id: int, id: int, db: Session
 ):
-    while True:
-        try:
-            data = await websocket.receive_text()
+    try:
+        while True:
+            pass
+    except Exception as e:
+        if user_id in active_connections:
+            # user_statuses[user_id] = "offline"
+            # await send_user_status_update(user_id, "offline")
+            del active_connections[user_id]
+    finally:
+        if user_id in active_connections:
+            # user_statuses[user_id] = "offline"
+            # await send_user_status_update(user_id, "offline")
+            del active_connections[user_id]
+            await websocket.close()
 
-            # Handle the message
-            if str(id) in active_connections:
-                new_message = Message(sender_id=user_id, receiver_id=id, content=data)
-                db.add(new_message)
-                db.commit()
-                db.refresh(new_message)
-                await broadcast_message(data, active_connections[str(id)])
-        except Exception as e:
-            print(f"Error handling WebSocket communication: {str(e)}")
+
+
+
+async def send_user_status_update(user_id: int, status: str):
+    websocket = active_connections.get(str(user_id))
+    if websocket:
+        # Construct and send status update message
+        status_message = {"user_id": user_id, "status": status}
+        await websocket.send_json(status_message)
+
+
+# WebSocket disconnection event handler
+async def websocket_disconnect(user_id: int):
+    if user_id in active_connections:
+        del active_connections[user_id]
+        user_statuses[user_id] = "offline"
+        await send_user_status_update(user_id, "offline")
             
 
 
@@ -63,13 +83,55 @@ async def websocket_endpoint_personal_chat(
     await websocket.accept()
     try:
         web_list.append(websocket)
-        user_id = await authenticate_user(websocket, db)
+        jwt_token = websocket.headers.get("Authorization")
+        user_id = decode_jwt_token(jwt_token)
         active_connections[str(user_id)] = websocket
-        await handle_websocket_communication(websocket, user_id, id, db)
-    except HTTPException as e:
-        if str(user_id) in active_connections:
-            del active_connections[str(user_id)]
-        await websocket.close(code=e.status_code)
+        # user_statuses[user_id] = "online"
+        status_message = {"user_id": user_id, "status": "online"}
+        await websocket.send_json(status_message)  
+        data = await websocket.receive_text()
+        # Handle the message
+        if str(id) in active_connections:
+            new_message = Message(sender_id=user_id, receiver_id=id, content=data)
+            db.add(new_message)
+            db.commit()
+            db.refresh(new_message)
+            await broadcast_message(data, active_connections[str(id)])
+    # except HTTPException as e:
+    #     if user_id in active_connections:
+    #         del active_connections[user_id]
+    #     print("HTTP")
+    #         # user_statuses[user_id] = "offline"
+    #         # await send_user_status_update(user_id, "offline")
+    except WebSocketDisconnect:
+        print("===========================================")
+        if str(user_id) in active_connections:  
+            status_message = {"user_id": user_id, "status": "offline"}
+            await websocket.send_json(status_message)
+        
+    except Exception as e:
+        status_message = {"user_id": user_id, "status": "offline"}
+        await websocket.send_json(status_message)
+        if str(user_id) in active_connections:   
+            del active_connections[user_id]
+        print("EXCEPTIPON")
+    finally:
+        # breakpoint()
+        if websocket.client_state == "connected":
+            del active_connections[user_id]
+            await websocket.close()
+        # user_statuses[user_id] = "offline"
+        print("Finally")
+
+        # if user_id in active_connections:
+        #     user_statuses[user_id] = "offline"
+        #     await send_user_status_update(user_id, "offline")
+
+
+
+# Check user online status
+def is_user_online(user_id: int) -> bool:
+    return user_id in active_connections
 
 
 
