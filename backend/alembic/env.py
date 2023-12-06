@@ -4,6 +4,7 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from chat.models.message import Message
 from chat.models.user_info import User
+from chat.models.group import ChatGroup, GroupMembership
 from config import Base
 
 from alembic import context
